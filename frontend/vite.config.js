@@ -6,6 +6,7 @@ export default defineConfig({
 
   preview: {
     host: '0.0.0.0',
-    allowedHosts: ['raju-tattoo-frontend.onrender.com']
+    port: Number(process.env.PORT) || 4173,
+    allowedHosts: true
   }
 })

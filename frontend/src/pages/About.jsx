@@ -1,5 +1,7 @@
 import React from 'react';
 import { ShieldCheck, Award, Heart, Sparkles, CheckCircle2 } from 'lucide-react';
+import tattooDesignImg from '../assets/images/tattoo-design.jpg';
+import customTattooImg from '../assets/images/custom-tattoo.jpg';
 
 const About = () => {
   return (
@@ -46,7 +48,7 @@ const About = () => {
 
           <div className="card" style={{ padding: 0, overflow: 'hidden', height: '380px' }}>
             <img
-              src="/images/tattoo-design.jpg"
+              src={tattooDesignImg}
               alt="Studio interior"
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
@@ -63,7 +65,7 @@ const About = () => {
           }}>
             <div style={{ height: '320px', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
               <img
-                src="/images/custom-tattoo.jpg"
+                src={customTattooImg}
                 alt="Lead Artist Raju"
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
