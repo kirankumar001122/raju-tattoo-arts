@@ -78,4 +78,14 @@ public class BookingController {
         Booking updated = bookingService.updateBookingStatus(id, newStatus);
         return ResponseEntity.ok(updated);
     }
+
+    // PUT /api/bookings/{id}/fcm-token -> 200 OK
+    @PutMapping("/{id}/fcm-token")
+    public ResponseEntity<Map<String, String>> updateBookingFcmToken(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        String fcmToken = body.get("fcmToken");
+        bookingService.saveFcmToken(id, fcmToken);
+        return ResponseEntity.ok(Map.of("message", "FCM token saved successfully for booking #" + id));
+    }
 }

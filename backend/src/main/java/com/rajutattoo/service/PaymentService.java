@@ -65,13 +65,16 @@ public class PaymentService {
     private static final Map<String, BigDecimal> SERVICE_PRICES = new HashMap<>();
 
     static {
-        SERVICE_PRICES.put("Tattoo Design & Tattooing", new BigDecimal("2000.00"));
-        SERVICE_PRICES.put("Custom Tattoos", new BigDecimal("3500.00"));
-        SERVICE_PRICES.put("Cover Up Tattoo", new BigDecimal("4000.00"));
-        SERVICE_PRICES.put("Piercing", new BigDecimal("1000.00"));
-        SERVICE_PRICES.put("Tattoo Removal", new BigDecimal("3000.00"));
-        SERVICE_PRICES.put("Color Tattooing", new BigDecimal("3800.00"));
+        SERVICE_PRICES.put("Tattoo Design & Tattooing", new BigDecimal("300.00"));
+        SERVICE_PRICES.put("Tattoo Consultation", new BigDecimal("300.00"));
+        SERVICE_PRICES.put("Aftercare Guidance", new BigDecimal("500.00"));
         SERVICE_PRICES.put("Aftercare Service", new BigDecimal("500.00"));
+        SERVICE_PRICES.put("Custom Tattoos", new BigDecimal("600.00"));
+        SERVICE_PRICES.put("Piercing", new BigDecimal("800.00"));
+        SERVICE_PRICES.put("Piercings", new BigDecimal("800.00"));
+        SERVICE_PRICES.put("Cover Up Tattoo", new BigDecimal("1200.00"));
+        SERVICE_PRICES.put("Tattoo Cover-ups", new BigDecimal("1200.00"));
+        SERVICE_PRICES.put("Tattoo Removal", new BigDecimal("1800.00"));
     }
 
     @Autowired
@@ -129,20 +132,19 @@ public class PaymentService {
 
     public BigDecimal getServicePrice(String serviceName) {
         if (serviceName == null || serviceName.trim().isEmpty()) {
-            return new BigDecimal("2000.00");
+            return new BigDecimal("300.00");
         }
 
         String s = serviceName.trim().toLowerCase();
-        if (s.contains("cover")) return new BigDecimal("4000.00");
-        if (s.contains("color")) return new BigDecimal("3800.00");
-        if (s.contains("custom")) return new BigDecimal("3500.00");
-        if (s.contains("removal")) return new BigDecimal("3000.00");
-        if (s.contains("piercing")) return new BigDecimal("1000.00");
+        if (s.contains("removal")) return new BigDecimal("1800.00");
+        if (s.contains("cover")) return new BigDecimal("1200.00");
+        if (s.contains("piercing")) return new BigDecimal("800.00");
+        if (s.contains("custom")) return new BigDecimal("600.00");
         if (s.contains("aftercare")) return new BigDecimal("500.00");
-        if (s.contains("consultation")) return new BigDecimal("500.00");
-        if (s.contains("design") || s.contains("tattooing")) return new BigDecimal("2000.00");
+        if (s.contains("consultation")) return new BigDecimal("300.00");
+        if (s.contains("design") || s.contains("tattooing")) return new BigDecimal("300.00");
 
-        return SERVICE_PRICES.getOrDefault(serviceName.trim(), new BigDecimal("2000.00"));
+        return SERVICE_PRICES.getOrDefault(serviceName.trim(), new BigDecimal("300.00"));
     }
 
     public Map<String, Object> createBookingOrder(Map<String, Object> bookingForm, String authenticatedUserEmail) {

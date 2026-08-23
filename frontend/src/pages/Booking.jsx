@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { createBookingOrder, verifyPaymentAndBook } from '../services/api';
+import { createBookingOrder, verifyPaymentAndBook, updateBookingFcmToken } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { Calendar, CheckCircle2, AlertCircle, Loader2, List, ArrowRight, CreditCard, ShieldCheck } from 'lucide-react';
+import { requestNotificationPermissionAndGetToken } from '../firebase';
+import { Calendar, CheckCircle2, AlertCircle, Loader2, List, ArrowRight, CreditCard, ShieldCheck, Bell } from 'lucide-react';
 
 const Booking = () => {
   const [searchParams] = useSearchParams();
   const initialService = searchParams.get('service') || '';
   const { user } = useAuth();
+
+  const [fcmToken, setFcmToken] = useState('');
+  const [fcmPermissionGranted, setFcmPermissionGranted] = useState(false);
+  const [fcmLoading, setFcmLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     customerName: user ? user.name : '',
@@ -44,17 +49,32 @@ const Booking = () => {
     }
   }, [initialService]);
 
+  const handleEnableNotifications = async () => {
+    setFcmLoading(true);
+    try {
+      const token = await requestNotificationPermissionAndGetToken();
+      if (token) {
+        setFcmToken(token);
+        setFcmPermissionGranted(true);
+      }
+    } catch (err) {
+      console.warn('FCM Notification permission error:', err);
+    } finally {
+      setFcmLoading(false);
+    }
+  };
+
   const getServiceDisplayPrice = (serviceName) => {
-    if (!serviceName) return '2,000';
+    if (!serviceName) return '300';
     const s = serviceName.toLowerCase();
-    if (s.includes('cover')) return '4,000';
-    if (s.includes('color')) return '3,800';
-    if (s.includes('custom')) return '3,500';
-    if (s.includes('removal')) return '3,000';
-    if (s.includes('piercing')) return '1,000';
+    if (s.includes('removal')) return '1,800';
+    if (s.includes('cover')) return '1,200';
+    if (s.includes('piercing')) return '800';
+    if (s.includes('custom')) return '600';
     if (s.includes('aftercare')) return '500';
-    if (s.includes('consultation')) return '500';
-    return '2,000';
+    if (s.includes('consultation')) return '300';
+    if (s.includes('design') || s.includes('tattooing')) return '300';
+    return '300';
   };
 
   const handleChange = (e) => {
@@ -148,6 +168,15 @@ const Booking = () => {
             });
 
             setSuccessResponse(verifyRes.data);
+            const createdBookingId = verifyRes.data ? verifyRes.data.bookingId : null;
+            if (createdBookingId && fcmToken) {
+              try {
+                await updateBookingFcmToken(createdBookingId, fcmToken);
+              } catch (tErr) {
+                console.warn('FCM token registration warning:', tErr);
+              }
+            }
+
             setFormData({
               customerName: user ? user.name : '',
               phone: user ? user.phone : '',
@@ -430,12 +459,13 @@ const Booking = () => {
                   onChange={handleChange}
                   className="form-select"
                 >
-                  <option value="Tattoo Design & Tattooing">Tattoo Design & Tattooing — ₹2,000</option>
-                  <option value="Custom Tattoos">Custom Tattoos — ₹3,500</option>
-                  <option value="Cover Up Tattoo">Cover Up Tattoo — ₹4,000</option>
-                  <option value="Piercing">Piercing — ₹1,000</option>
-                  <option value="Tattoo Removal">Tattoo Removal — ₹3,000</option>
-                  <option value="Color Tattooing">Color Tattooing — ₹3,800</option>
+                  <option value="Tattoo Design & Tattooing">Tattoo Design & Tattooing — ₹300</option>
+                  <option value="Tattoo Consultation">Tattoo Consultation — ₹300</option>
+                  <option value="Aftercare Guidance">Aftercare Guidance — ₹500</option>
+                  <option value="Custom Tattoos">Custom Tattoos — ₹600</option>
+                  <option value="Piercing">Piercing — ₹800</option>
+                  <option value="Cover Up Tattoo">Cover Up Tattoo — ₹1,200</option>
+                  <option value="Tattoo Removal">Tattoo Removal — ₹1,800</option>
                 </select>
               </div>
 
@@ -493,6 +523,36 @@ const Booking = () => {
                 placeholder="Any skin sensitivities, allergies, or questions for artist..."
                 className="form-textarea"
               />
+            </div>
+
+            {/* PUSH NOTIFICATIONS BANNER */}
+            <div style={{
+              backgroundColor: 'rgba(201, 162, 39, 0.06)',
+              border: '1px solid var(--border-dark)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '14px 18px',
+              marginTop: '16px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Bell size={18} className="text-gold" />
+                <span style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                  Enable notifications to receive appointment updates.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleEnableNotifications}
+                disabled={fcmPermissionGranted || fcmLoading}
+                className="btn-secondary"
+                style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+              >
+                {fcmPermissionGranted ? '✓ Notifications Enabled' : (fcmLoading ? 'Enabling...' : 'Enable Notifications')}
+              </button>
             </div>
 
             {/* DYNAMIC SERVICE PRICE SUMMARY BOX */}

@@ -15,7 +15,7 @@ const Services = () => {
     {
       id: 'tattoo-design',
       name: 'Tattoo Design & Tattooing',
-      price: 'Starting from ₹2,000',
+      price: 'Starting from ₹300',
       description: 'Professional execution of custom flash art, crisp lettering, geometric shapes, and traditional tattoos with high precision linework.',
       image: tattooDesignImg,
       features: ['Crisp linework & shading', 'Pre-sterilized single-use equipment', 'Custom placement preview']
@@ -23,7 +23,7 @@ const Services = () => {
     {
       id: 'custom-tattoos',
       name: 'Custom Tattoos',
-      price: 'Starting from ₹3,500',
+      price: 'Starting from ₹600',
       description: 'One-of-a-kind bespoke tattoo designs created from scratch according to your personal story, body ergonomics, and aesthetic preference.',
       image: customTattooImg,
       features: ['1-on-1 Artist digital drafting', 'Custom body placement stencil', 'Exclusive original artwork']
@@ -31,7 +31,7 @@ const Services = () => {
     {
       id: 'tattoo-removal',
       name: 'Tattoo Removal',
-      price: 'Starting from ₹1,500 / session',
+      price: 'Starting from ₹1,800 / session',
       description: 'Professional tattoo removal consultation and treatment guidance tailored to your tattoo and skin requirements.',
       image: tattooRemovalImg,
       features: ['Targeted laser consultation', 'Skin assessment & care protocol', 'Suitable for partial cover-up preparation']
@@ -39,10 +39,10 @@ const Services = () => {
     {
       id: 'tattoo-coverups',
       name: 'Tattoo Cover-ups',
-      price: 'Starting from ₹4,000',
+      price: 'Starting from ₹1,200',
       description: 'Transform unwanted or faded legacy tattoos into vibrant new artwork using specialized color blending and shading techniques.',
       image: coverUpImg,
-      features: ['Old ink camouflage design', 'Creative flow integration', 'Free assessment consultation']
+      features: ['Old ink camouflage design', 'Creative flow integration', 'Assessment consultation']
     },
     {
       id: 'piercings',
@@ -55,15 +55,15 @@ const Services = () => {
     {
       id: 'tattoo-consultation',
       name: 'Tattoo Consultation',
-      price: 'FREE / Complimentary',
+      price: 'Starting from ₹300',
       description: 'Sit down with master artist Raju to discuss ideas, body placement, estimated session hours, sizing, and pricing transparency.',
       image: consultationImg,
-      features: ['No-obligation discussion', 'Transparent price estimate', 'Artist guidance on ink placement']
+      features: ['1-on-1 Artist discussion', 'Transparent price estimate', 'Artist guidance on ink placement']
     },
     {
       id: 'aftercare-guidance',
       name: 'Aftercare Guidance',
-      price: 'Included with all sessions',
+      price: 'Starting from ₹500',
       description: 'Comprehensive healing kits, protective dermal wraps, and step-by-step instructions for proper tattoo care during recovery.',
       image: aftercareImg,
       features: ['Protective dermal wrap applied', 'Step-by-step aftercare instructions', 'Soothing healing balm guidance']

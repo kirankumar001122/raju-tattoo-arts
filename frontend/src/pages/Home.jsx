@@ -45,10 +45,10 @@ const Home = () => {
   ];
 
   const servicesPreview = [
-    { name: 'Custom Tattoo Design', price: 'From ₹2,000', desc: 'Bespoke artwork engineered tailored to your vision and body flow.' },
-    { name: 'Tattoo Cover-ups', price: 'From ₹3,500', desc: 'Expert redesign technique to transform old tattoos into fresh masterpieces.' },
-    { name: 'Tattoo Removal', price: 'From ₹1,500', desc: 'Professional tattoo removal consultation and treatment guidance tailored to your needs.' },
-    { name: 'Body Piercings', price: 'From ₹800', desc: 'Surgical titanium piercings performed under strict hygiene standards.' }
+    { name: 'Tattoo Design & Tattooing', price: 'From ₹300', desc: 'Bespoke artwork engineered tailored to your vision and body flow.' },
+    { name: 'Custom Tattoos', price: 'From ₹600', desc: 'Expert custom tattoo artwork created from scratch.' },
+    { name: 'Cover Up Tattoo', price: 'From ₹1,200', desc: 'Expert redesign technique to transform old tattoos into fresh masterpieces.' },
+    { name: 'Tattoo Removal', price: 'From ₹1,800', desc: 'Professional tattoo removal consultation and treatment guidance tailored to your needs.' }
   ];
 
   return (

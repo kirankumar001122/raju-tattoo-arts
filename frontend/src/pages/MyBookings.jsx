@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getMyBookings, getMyContactEnquiries } from '../services/api';
-import { Calendar, Clock, RefreshCw, AlertCircle, Loader2, Sparkles, PlusCircle, MessageSquare, Mail } from 'lucide-react';
+import { getMyBookings, getMyContactEnquiries, updateBookingFcmToken } from '../services/api';
+import { requestNotificationPermissionAndGetToken } from '../firebase';
+import { Calendar, Clock, RefreshCw, AlertCircle, Loader2, Sparkles, PlusCircle, MessageSquare, Mail, Bell } from 'lucide-react';
 
 const MyBookings = () => {
   const [bookings, setBookings] = useState([]);
@@ -9,6 +10,8 @@ const MyBookings = () => {
   const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' or 'enquiries'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [fcmEnabled, setFcmEnabled] = useState(false);
+  const [fcmLoading, setFcmLoading] = useState(false);
 
   useEffect(() => {
     fetchUserData();
@@ -28,6 +31,29 @@ const MyBookings = () => {
       setError(err.message || 'Failed to retrieve your account data. Please check network connection.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEnableNotifications = async () => {
+    setFcmLoading(true);
+    try {
+      const token = await requestNotificationPermissionAndGetToken();
+      if (token) {
+        setFcmEnabled(true);
+        if (bookings && bookings.length > 0) {
+          for (const b of bookings) {
+            try {
+              await updateBookingFcmToken(b.id, token);
+            } catch (e) {
+              console.warn('FCM token save for booking warning:', e);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Notification permission error:', err);
+    } finally {
+      setFcmLoading(false);
     }
   };
 
@@ -88,6 +114,35 @@ const MyBookings = () => {
               <PlusCircle size={16} /> New Booking
             </Link>
           </div>
+        </div>
+
+        {/* PUSH NOTIFICATIONS BANNER */}
+        <div style={{
+          backgroundColor: 'rgba(201, 162, 39, 0.06)',
+          border: '1px solid var(--border-gold)',
+          borderRadius: 'var(--radius-sm)',
+          padding: '14px 20px',
+          marginBottom: '24px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Bell size={20} className="text-gold" />
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+              Enable push notifications to receive instant browser updates for your appointments.
+            </span>
+          </div>
+          <button
+            onClick={handleEnableNotifications}
+            disabled={fcmEnabled || fcmLoading}
+            className="btn-secondary"
+            style={{ padding: '8px 18px', fontSize: '0.85rem' }}
+          >
+            {fcmEnabled ? '✓ Notifications Enabled' : (fcmLoading ? 'Enabling...' : 'Enable Notifications')}
+          </button>
         </div>
 
         {/* NAVIGATION TABS */}

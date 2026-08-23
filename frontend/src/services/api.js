@@ -56,6 +56,7 @@ export const getBookingById = (id) => api.get(`/bookings/${id}`);
 export const trackBooking = (bookingId, email) => 
   api.get(`/bookings/track?bookingId=${bookingId}&email=${encodeURIComponent(email)}`);
 export const updateBookingStatus = (id, status) => api.put(`/bookings/${id}/status`, { status });
+export const updateBookingFcmToken = (bookingId, fcmToken) => api.put(`/bookings/${bookingId}/fcm-token`, { fcmToken });
 
 // Contact Services
 export const createContactEnquiry = (enquiryData) => api.post('/contact', enquiryData);

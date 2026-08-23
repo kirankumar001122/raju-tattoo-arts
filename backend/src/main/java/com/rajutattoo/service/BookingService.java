@@ -5,6 +5,8 @@ import com.rajutattoo.entity.User;
 import com.rajutattoo.exception.ResourceNotFoundException;
 import com.rajutattoo.repository.BookingRepository;
 import com.rajutattoo.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,22 +22,26 @@ import java.util.Map;
 @Service
 public class BookingService {
 
+    private static final Logger logger = LoggerFactory.getLogger(BookingService.class);
     private static final List<String> ALLOWED_STATUSES = Arrays.asList("PENDING", "CONFIRMED", "COMPLETED", "CANCELLED", "REJECTED");
 
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final SmsNotificationService smsNotificationService;
+    private final FirebaseNotificationService firebaseNotificationService;
 
     @Autowired
     public BookingService(BookingRepository bookingRepository,
                            UserRepository userRepository,
                            EmailService emailService,
-                           SmsNotificationService smsNotificationService) {
+                           SmsNotificationService smsNotificationService,
+                           FirebaseNotificationService firebaseNotificationService) {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.emailService = emailService;
         this.smsNotificationService = smsNotificationService;
+        this.firebaseNotificationService = firebaseNotificationService;
     }
 
     public Booking createBooking(Booking booking) {
@@ -87,13 +93,13 @@ public class BookingService {
 
         Booking savedBooking = bookingRepository.save(booking);
 
-        // Trigger email & SMS notifications safely
-        emailService.sendBookingCreatedEmail(savedBooking);
-        smsNotificationService.sendBookingSmsNotification(
-                savedBooking,
-                "CREATED",
-                "Hello " + savedBooking.getCustomerName() + ", your appointment #" + savedBooking.getId() + " request has been received (PENDING)."
-        );
+        // Trigger notifications safely (Email, FCM Push)
+        try {
+            emailService.sendBookingCreatedEmail(savedBooking);
+            firebaseNotificationService.sendBookingStatusPushNotification(savedBooking, "PENDING");
+        } catch (Exception ex) {
+            logger.error("Notification trigger failed for created bookingId={}: {}", savedBooking.getId(), ex.getMessage());
+        }
 
         return savedBooking;
     }
@@ -141,9 +147,9 @@ public class BookingService {
         String oldStatus = booking.getStatus();
         String upperNewStatus = newStatus.toUpperCase();
 
-        // 1. Duplicate status protection: If oldStatus equals newStatus, do not update database and do not send email
+        // 1. Duplicate status protection: If oldStatus equals newStatus, do not update database and do not send notification
         if (oldStatus != null && oldStatus.equalsIgnoreCase(upperNewStatus)) {
-            org.slf4j.LoggerFactory.getLogger(BookingService.class).info("Status for bookingId={} is already {}. No update or email sent.", id, upperNewStatus);
+            logger.info("Status for bookingId={} is already {}. No update or notification sent.", id, upperNewStatus);
             return booking;
         }
 
@@ -152,21 +158,31 @@ public class BookingService {
         booking.setStatusUpdatedAt(LocalDateTime.now());
         Booking updatedBooking = bookingRepository.save(booking);
 
-        org.slf4j.LoggerFactory.getLogger(BookingService.class).info("Appointment status updated successfully: bookingId={}, status={}", updatedBooking.getId(), upperNewStatus);
+        logger.info("Appointment status updated successfully in MySQL: bookingId={}, status={}", updatedBooking.getId(), upperNewStatus);
 
-        // 3. Only after successful database update, send email notification safely (without rolling back status if email fails)
+        // 3. Only after successful database update, trigger notifications safely (Email, FCM Push)
         try {
             emailService.sendBookingStatusUpdateEmail(updatedBooking, oldStatus, upperNewStatus);
-            smsNotificationService.sendBookingSmsNotification(
-                    updatedBooking,
-                    upperNewStatus,
-                    "Hello " + updatedBooking.getCustomerName() + ", your appointment #" + updatedBooking.getId() + " status is now " + upperNewStatus + "."
-            );
+            firebaseNotificationService.sendBookingStatusPushNotification(updatedBooking, upperNewStatus);
         } catch (Exception ex) {
-            org.slf4j.LoggerFactory.getLogger(BookingService.class).error("Email notification failed for bookingId={}: {}", updatedBooking.getId(), ex.getMessage());
+            logger.error("Notification dispatch error for bookingId={}: {}", updatedBooking.getId(), ex.getMessage());
         }
 
         return updatedBooking;
+    }
+
+    public void saveFcmToken(Long bookingId, String fcmToken) {
+        if (fcmToken == null || fcmToken.isBlank()) return;
+        Booking booking = getBookingById(bookingId);
+        booking.setFcmToken(fcmToken.trim());
+        bookingRepository.save(booking);
+
+        if (booking.getUser() != null) {
+            User user = booking.getUser();
+            user.setFcmToken(fcmToken.trim());
+            userRepository.save(user);
+        }
+        logger.info("Saved FCM registration token for Booking #{}", bookingId);
     }
 
     public Booking saveDirectly(Booking booking) {
