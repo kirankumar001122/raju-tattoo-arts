@@ -4,49 +4,56 @@ import com.rajutattoo.entity.Booking;
 import com.rajutattoo.entity.Notification;
 import com.rajutattoo.repository.NotificationRepository;
 import jakarta.annotation.PostConstruct;
-import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Service
 public class EmailService {
 
     private static final Logger logger = LoggerFactory.getLogger(EmailService.class);
+    private static final String RESEND_API_URL = "https://api.resend.com/emails";
 
-    private final JavaMailSender mailSender;
     private final NotificationRepository notificationRepository;
+    private final HttpClient httpClient;
 
-    @Value("${spring.mail.username:rajutattoadda@gmail.com}")
-    private String fromEmail;
+    @Value("${resend.api.key:${RESEND_API_KEY:}}")
+    private String resendApiKey;
 
-    @Value("${spring.mail.password:}")
-    private String mailPassword;
+    @Value("${resend.from.email:${RESEND_FROM_EMAIL:Raju Tattoo Arts <onboarding@resend.dev>}}")
+    private String resendFromEmail;
 
     @Autowired
-    public EmailService(@Autowired(required = false) JavaMailSender mailSender, NotificationRepository notificationRepository) {
-        this.mailSender = mailSender;
+    public EmailService(NotificationRepository notificationRepository) {
         this.notificationRepository = notificationRepository;
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .build();
     }
 
     @PostConstruct
     public void init() {
+        boolean keyDetected = resendApiKey != null && !resendApiKey.trim().isEmpty();
         logger.info("==================================================");
-        logger.info("SPRING MAIL CONFIGURATION VERIFICATION");
-        logger.info("MAIL_USERNAME = {}", (fromEmail != null && !fromEmail.trim().isEmpty()) ? "detected (" + fromEmail + ")" : "NOT DETECTED");
-        logger.info("MAIL_PASSWORD = {}", (mailPassword != null && !mailPassword.trim().isEmpty()) ? "detected" : "NOT DETECTED (EMPTY)");
+        logger.info("RESEND EMAIL API SERVICE INITIALIZED");
+        logger.info("RESEND_API_KEY = {}", keyDetected ? "configured [PROTECTED]" : "NOT CONFIGURATION (MISSING)");
+        logger.info("RESEND_FROM_EMAIL = {}", resendFromEmail);
         logger.info("==================================================");
     }
 
     /**
-     * Dispatches HTML email to customer when a booking request is newly created.
+     * Dispatches HTML email to customer via Resend API when a booking request is newly created.
      */
     public void sendBookingCreatedEmail(Booking booking) {
         if (booking == null || booking.getEmail() == null || booking.getEmail().isBlank()) {
@@ -56,13 +63,13 @@ public class EmailService {
 
         String recipientEmail = booking.getEmail().trim();
         String customerName = booking.getCustomerName() != null ? booking.getCustomerName() : "Valued Customer";
-        String subject = "Raju Tattoo Arts – Appointment Request Received";
+        String subject = "Raju Tattoo Arts – Appointment Received";
 
         String statusBadgeHtml = getStatusBadgeHtml("PENDING");
         String messageText = "Thank you for choosing Raju Tattoo Arts.<br><br>We have received your appointment request and it is currently pending confirmation. Our studio team will review your request shortly and notify you when the status changes.";
 
         String htmlContent = buildHtmlEmailTemplate(
-                "Appointment Request Received",
+                "Appointment Received",
                 customerName,
                 booking,
                 "PENDING",
@@ -71,12 +78,11 @@ public class EmailService {
                 null
         );
 
-        logger.info("Sending appointment creation email for booking #{} to customer ({})", booking.getId(), recipientEmail);
-        dispatchHtmlEmailAndLog(booking, "BOOKING_CREATED", recipientEmail, subject, htmlContent);
+        dispatchResendEmailAndLog(booking, "BOOKING_CREATED", recipientEmail, subject, htmlContent);
     }
 
     /**
-     * Dispatches HTML email to customer when appointment status changes.
+     * Dispatches HTML email to customer via Resend API when appointment status changes.
      */
     public void sendBookingStatusUpdateEmail(Booking booking, String oldStatus, String newStatus) {
         if (booking == null || booking.getEmail() == null || booking.getEmail().isBlank()) {
@@ -99,22 +105,22 @@ public class EmailService {
         switch (upperStatus) {
             case "CONFIRMED":
                 subject = "Raju Tattoo Arts – Appointment Confirmed";
-                messageText = "Great news! Your appointment has been confirmed. We look forward to seeing you at Raju Tattoo Arts.";
+                messageText = "Great news! Your appointment has been confirmed. We look forward to seeing you at Raju Tattoo Arts studio.";
                 break;
             case "COMPLETED":
                 subject = "Raju Tattoo Arts – Appointment Completed";
-                messageText = "Your appointment has been marked as completed. Thank you for choosing Raju Tattoo Arts!";
+                messageText = "Your appointment has been marked as completed. Thank you for choosing Raju Tattoo Arts! We hope you love your tattoo session.";
                 break;
             case "CANCELLED":
                 subject = "Raju Tattoo Arts – Appointment Cancelled";
                 messageText = "Your appointment has been cancelled. If you have any questions or wish to reschedule, please contact Raju Tattoo Arts.";
                 break;
             case "REJECTED":
-                subject = "Raju Tattoo Arts – Appointment Rejected";
+                subject = "Raju Tattoo Arts – Appointment Update";
                 messageText = "Unfortunately, your appointment request could not be accepted at this time. Please contact us if you would like to discuss alternative availability.";
                 break;
             default:
-                subject = "Raju Tattoo Arts – Appointment Status Updated (" + upperStatus + ")";
+                subject = "Raju Tattoo Arts – Appointment Update";
                 messageText = "Your appointment status has been updated to " + upperStatus + ". Thank you for choosing Raju Tattoo Arts.";
                 break;
         }
@@ -131,12 +137,11 @@ public class EmailService {
                 oldStatus
         );
 
-        logger.info("Appointment #{} status changed from {} to {}", booking.getId(), oldStatus, upperStatus);
-        dispatchHtmlEmailAndLog(booking, "BOOKING_STATUS_" + upperStatus, recipientEmail, subject, htmlContent);
+        dispatchResendEmailAndLog(booking, "BOOKING_STATUS_" + upperStatus, recipientEmail, subject, htmlContent);
     }
 
     /**
-     * Dispatches HTML payment verification receipt email.
+     * Dispatches HTML payment verification receipt email via Resend API.
      */
     public void sendPaymentSuccessEmail(Booking booking, String razorpayPaymentId, String razorpayOrderId, BigDecimal amount) {
         if (booking == null || booking.getEmail() == null || booking.getEmail().isBlank()) {
@@ -167,8 +172,7 @@ public class EmailService {
                 null
         );
 
-        logger.info("Sending payment confirmation email for booking #{} to customer ({})", booking.getId(), recipientEmail);
-        dispatchHtmlEmailAndLog(booking, "PAYMENT_CONFIRMED", recipientEmail, subject, htmlContent);
+        dispatchResendEmailAndLog(booking, "PAYMENT_CONFIRMED", recipientEmail, subject, htmlContent);
     }
 
     /**
@@ -194,6 +198,26 @@ public class EmailService {
                     "<td style=\"padding: 10px 14px; color: #A1A1AA; font-size: 13px; font-weight: 600; border-bottom: 1px solid #27272A;\">Previous Status</td>" +
                     "<td style=\"padding: 10px 14px; color: #D4D4D8; font-size: 13px; border-bottom: 1px solid #27272A;\">%s</td>" +
                     "</tr>", previousStatus.toUpperCase()
+            );
+        }
+
+        String tattooRequirementsRow = "";
+        if (booking.getRequirements() != null && !booking.getRequirements().isBlank()) {
+            tattooRequirementsRow = String.format(
+                    "<tr>" +
+                    "<td style=\"padding: 10px 14px; color: #A1A1AA; font-size: 13px; font-weight: 600; border-bottom: 1px solid #27272A;\">Tattoo Requirements</td>" +
+                    "<td style=\"padding: 10px 14px; color: #FFFFFF; font-size: 13px; border-bottom: 1px solid #27272A;\">%s</td>" +
+                    "</tr>", escapeHtml(booking.getRequirements())
+            );
+        }
+
+        String notesRow = "";
+        if (booking.getAdditionalNotes() != null && !booking.getAdditionalNotes().isBlank()) {
+            notesRow = String.format(
+                    "<tr>" +
+                    "<td style=\"padding: 10px 14px; color: #A1A1AA; font-size: 13px; font-weight: 600; border-bottom: 1px solid #27272A;\">Additional Notes</td>" +
+                    "<td style=\"padding: 10px 14px; color: #FFFFFF; font-size: 13px; border-bottom: 1px solid #27272A;\">%s</td>" +
+                    "</tr>", escapeHtml(booking.getAdditionalNotes())
             );
         }
 
@@ -235,7 +259,11 @@ public class EmailService {
                 "                  </td>" +
                 "                </tr>" +
                 "                <tr>" +
-                "                  <td style=\"padding: 10px 14px; color: #A1A1AA; font-size: 13px; font-weight: 600; border-bottom: 1px solid #27272A; width: 40%;\">Booking ID</td>" +
+                "                  <td style=\"padding: 10px 14px; color: #A1A1AA; font-size: 13px; font-weight: 600; border-bottom: 1px solid #27272A; width: 40%;\">Customer Name</td>" +
+                "                  <td style=\"padding: 10px 14px; color: #FFFFFF; font-size: 13px; font-weight: 700; border-bottom: 1px solid #27272A;\">" + escapeHtml(customerName) + "</td>" +
+                "                </tr>" +
+                "                <tr>" +
+                "                  <td style=\"padding: 10px 14px; color: #A1A1AA; font-size: 13px; font-weight: 600; border-bottom: 1px solid #27272A;\">Booking ID</td>" +
                 "                  <td style=\"padding: 10px 14px; color: #FFFFFF; font-size: 13px; font-weight: 700; border-bottom: 1px solid #27272A;\">#" + booking.getId() + "</td>" +
                 "                </tr>" +
                 "                <tr>" +
@@ -243,14 +271,16 @@ public class EmailService {
                 "                  <td style=\"padding: 10px 14px; color: #FFFFFF; font-size: 13px; font-weight: 600; border-bottom: 1px solid #27272A;\">" + escapeHtml(serviceName) + "</td>" +
                 "                </tr>" +
                 "                <tr>" +
-                "                  <td style=\"padding: 10px 14px; color: #A1A1AA; font-size: 13px; font-weight: 600; border-bottom: 1px solid #27272A;\">Date</td>" +
+                "                  <td style=\"padding: 10px 14px; color: #A1A1AA; font-size: 13px; font-weight: 600; border-bottom: 1px solid #27272A;\">Appointment Date</td>" +
                 "                  <td style=\"padding: 10px 14px; color: #FFFFFF; font-size: 13px; border-bottom: 1px solid #27272A;\">" + formattedDate + "</td>" +
                 "                </tr>" +
                 "                <tr>" +
-                "                  <td style=\"padding: 10px 14px; color: #A1A1AA; font-size: 13px; font-weight: 600; border-bottom: 1px solid #27272A;\">Time</td>" +
+                "                  <td style=\"padding: 10px 14px; color: #A1A1AA; font-size: 13px; font-weight: 600; border-bottom: 1px solid #27272A;\">Appointment Time</td>" +
                 "                  <td style=\"padding: 10px 14px; color: #FFFFFF; font-size: 13px; border-bottom: 1px solid #27272A;\">" + formattedTime + "</td>" +
                 "                </tr>" +
                 previousStatusRow +
+                tattooRequirementsRow +
+                notesRow +
                 "                <tr>" +
                 "                  <td style=\"padding: 10px 14px; color: #A1A1AA; font-size: 13px; font-weight: 600;\">Current Status</td>" +
                 "                  <td style=\"padding: 10px 14px;\">" + statusBadgeHtml + "</td>" +
@@ -283,7 +313,7 @@ public class EmailService {
     }
 
     /**
-     * Generates styled HTML status badges matching theme colors.
+     * Generates styled HTML status badges matching studio theme colors.
      */
     private String getStatusBadgeHtml(String status) {
         if (status == null) status = "PENDING";
@@ -307,49 +337,55 @@ public class EmailService {
     }
 
     /**
-     * Dispatch HTML email via Spring JavaMailSender.
-     * Guaranteed fail-safe: logs diagnostic results and records notification without interrupting appointment database flow.
+     * Dispatch email via Resend HTTPS REST API.
+     * Fail-safe execution: Logs required details and records notification without rolling back DB updates.
      */
-    private void dispatchHtmlEmailAndLog(Booking booking, String type, String recipient, String subject, String htmlContent) {
+    private void dispatchResendEmailAndLog(Booking booking, String type, String recipient, String subject, String htmlContent) {
         boolean sentSuccessfully = false;
+        String resendResponseId = null;
 
         logger.info("==================================================");
-        logger.info("EMAIL NOTIFICATION DISPATCH INITIATED");
+        logger.info("Email notification requested");
         logger.info("Booking ID: #{}", booking.getId());
-        logger.info("Customer Name: {}", booking.getCustomerName());
-        logger.info("Recipient Email: {}", recipient);
-        logger.info("Notification Type: {}", type);
-        logger.info("Sender Email: {}", fromEmail);
+        logger.info("Customer email: {}", recipient);
+        logger.info("Notification type: {}", type);
+        logger.info("Subject: {}", subject);
 
-        if (mailPassword == null || mailPassword.trim().isEmpty()) {
-            logger.warn("[DIAGNOSTIC NOTICE] MAIL_PASSWORD environment variable is empty.");
-            logger.warn("To deliver real emails to {}, set MAIL_PASSWORD environment variable in Render with a 16-character Gmail App Password.", recipient);
-        }
+        String cleanApiKey = resendApiKey != null ? resendApiKey.trim() : "";
+        if (cleanApiKey.isEmpty()) {
+            logger.warn("[DIAGNOSTIC NOTICE] RESEND_API_KEY environment variable is empty.");
+            logger.warn("To deliver real emails to {}, configure RESEND_API_KEY in Render environment variables.", recipient);
+            logger.info("[MOCK RESEND DISPATCH] [{}] to {}: Subject: {}", type, recipient, subject);
+        } else {
+            try {
+                String sender = resendFromEmail != null && !resendFromEmail.isBlank()
+                        ? resendFromEmail.trim()
+                        : "Raju Tattoo Arts <onboarding@resend.dev>";
 
-        try {
-            if (mailSender != null) {
-                MimeMessage mimeMessage = mailSender.createMimeMessage();
-                MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+                String jsonBody = buildResendJsonPayload(sender, recipient, subject, htmlContent);
 
-                try {
-                    helper.setFrom(fromEmail, "Raju Tattoo Arts");
-                } catch (Exception ex) {
-                    helper.setFrom(fromEmail);
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(RESEND_API_URL))
+                        .header("Authorization", "Bearer " + cleanApiKey)
+                        .header("Content-Type", "application/json")
+                        .POST(HttpRequest.BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8))
+                        .timeout(Duration.ofSeconds(15))
+                        .build();
+
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+                if (response.statusCode() == 200 || response.statusCode() == 201) {
+                    sentSuccessfully = true;
+                    resendResponseId = parseResendId(response.body());
+                    logger.info("Resend email sent successfully for booking #{}. Resend response ID: {}", booking.getId(), resendResponseId);
+                } else {
+                    logger.error("Failed to send appointment email for booking #{}: Resend HTTP status {}, response body: {}",
+                            booking.getId(), response.statusCode(), response.body());
                 }
-
-                helper.setTo(recipient);
-                helper.setSubject(subject);
-                helper.setText(htmlContent, true);
-
-                mailSender.send(mimeMessage);
-                sentSuccessfully = true;
-                logger.info("Appointment confirmation email sent successfully to customer ({}) for booking #{}", recipient, booking.getId());
-            } else {
-                logger.info("[MOCK EMAIL DISPATCH] [{}] to {}: Subject: {}", type, recipient, subject);
+            } catch (Exception e) {
+                logger.error("Failed to send appointment email for booking #{}: Exception Type: {}, Message: {}",
+                        booking.getId(), e.getClass().getName(), e.getMessage());
             }
-        } catch (Exception e) {
-            logger.error("Failed to send appointment email for booking #{}: Exception Type: {}, Message: {}",
-                    booking.getId(), e.getClass().getName(), e.getMessage());
         }
         logger.info("==================================================");
 
@@ -360,12 +396,65 @@ public class EmailService {
             notification.setBookingId(booking.getId());
             notification.setType(type);
             notification.setStatus(sentSuccessfully ? "SENT" : "FAILED");
-            notification.setMessage("Subject: " + subject);
+            notification.setMessage("Subject: " + subject + (resendResponseId != null ? " (Resend ID: " + resendResponseId + ")" : ""));
             notification.setCreatedAt(LocalDateTime.now());
             notificationRepository.save(notification);
         } catch (Exception e) {
             logger.warn("Failed to record notification history in database: {}", e.getMessage());
         }
+    }
+
+    private String buildResendJsonPayload(String from, String to, String subject, String html) {
+        return String.format(
+                "{\"from\":%s,\"to\":[%s],\"subject\":%s,\"html\":%s}",
+                toJsonString(from),
+                toJsonString(to),
+                toJsonString(subject),
+                toJsonString(html)
+        );
+    }
+
+    private String toJsonString(String value) {
+        if (value == null) return "\"\"";
+        StringBuilder sb = new StringBuilder("\"");
+        for (char c : value.toCharArray()) {
+            switch (c) {
+                case '"': sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\b': sb.append("\\b"); break;
+                case '\f': sb.append("\\f"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                default:
+                    if (c < ' ') {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+                    break;
+            }
+        }
+        sb.append("\"");
+        return sb.toString();
+    }
+
+    private String parseResendId(String responseBody) {
+        if (responseBody == null) return null;
+        int idIdx = responseBody.indexOf("\"id\"");
+        if (idIdx != -1) {
+            int colonIdx = responseBody.indexOf(":", idIdx);
+            if (colonIdx != -1) {
+                int startQuote = responseBody.indexOf("\"", colonIdx);
+                if (startQuote != -1) {
+                    int endQuote = responseBody.indexOf("\"", startQuote + 1);
+                    if (endQuote != -1) {
+                        return responseBody.substring(startQuote + 1, endQuote);
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private String escapeHtml(String text) {

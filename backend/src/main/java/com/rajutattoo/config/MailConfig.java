@@ -1,50 +1,30 @@
 package com.rajutattoo.config;
 
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
-
-import java.util.Properties;
 
 @Configuration
 public class MailConfig {
 
-    @Value("${spring.mail.host:smtp.gmail.com}")
-    private String host;
+    private static final Logger logger = LoggerFactory.getLogger(MailConfig.class);
 
-    @Value("${spring.mail.port:587}")
-    private int port;
+    @Value("${resend.api.key:${RESEND_API_KEY:}}")
+    private String resendApiKey;
 
-    @Value("${spring.mail.username:rajutattoadda@gmail.com}")
-    private String username;
+    @Value("${resend.from.email:${RESEND_FROM_EMAIL:Raju Tattoo Arts <onboarding@resend.dev>}}")
+    private String resendFromEmail;
 
-    @Value("${spring.mail.password:}")
-    private String password;
-
-    @Bean
-    public JavaMailSender javaMailSender() {
-        JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
-        mailSender.setHost(host != null ? host.trim() : "smtp.gmail.com");
-        mailSender.setPort(port);
-
-        String cleanUsername = username != null ? username.trim() : "";
-        String cleanPassword = password != null ? password.trim().replaceAll("\\s+", "") : "";
-
-        mailSender.setUsername(cleanUsername);
-        mailSender.setPassword(cleanPassword);
-
-        Properties props = mailSender.getJavaMailProperties();
-        props.put("mail.transport.protocol", "smtp");
-        props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.smtp.starttls.required", "true");
-        props.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
-        props.put("mail.smtp.connectiontimeout", "10000");
-        props.put("mail.smtp.timeout", "10000");
-        props.put("mail.smtp.writetimeout", "10000");
-
-        return mailSender;
+    @PostConstruct
+    public void verifyResendConfigurationOnStartup() {
+        boolean keyDetected = resendApiKey != null && !resendApiKey.trim().isEmpty();
+        
+        logger.info("==================================================");
+        logger.info("RESEND EMAIL API CONFIGURATION VERIFICATION");
+        logger.info("RESEND_API_KEY configured: {}", keyDetected ? "YES [PROTECTED]" : "NO (Missing/Empty)");
+        logger.info("RESEND_FROM_EMAIL configured: {}", resendFromEmail);
+        logger.info("==================================================");
     }
 }
