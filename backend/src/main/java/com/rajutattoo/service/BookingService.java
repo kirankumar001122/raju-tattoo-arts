@@ -20,7 +20,7 @@ import java.util.Map;
 @Service
 public class BookingService {
 
-    private static final List<String> ALLOWED_STATUSES = Arrays.asList("PENDING", "CONFIRMED", "COMPLETED", "CANCELLED");
+    private static final List<String> ALLOWED_STATUSES = Arrays.asList("PENDING", "CONFIRMED", "COMPLETED", "CANCELLED", "REJECTED");
 
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
@@ -134,7 +134,7 @@ public class BookingService {
 
     public Booking updateBookingStatus(Long id, String newStatus) {
         if (newStatus == null || !ALLOWED_STATUSES.contains(newStatus.toUpperCase())) {
-            throw new IllegalArgumentException("Invalid status: " + newStatus + ". Allowed statuses are: PENDING, CONFIRMED, COMPLETED, CANCELLED");
+            throw new IllegalArgumentException("Invalid status: " + newStatus + ". Allowed statuses are: PENDING, CONFIRMED, COMPLETED, CANCELLED, REJECTED");
         }
 
         Booking booking = getBookingById(id);
