@@ -123,8 +123,15 @@ public class BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found. Please check your Booking ID."));
 
-        if (email == null || !booking.getEmail().equalsIgnoreCase(email.trim())) {
-            throw new ResourceNotFoundException("Unable to find a booking with the provided details.");
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Email address is required to track booking.");
+        }
+
+        String targetEmail = booking.getEmail() != null ? booking.getEmail().trim() : "";
+        String inputEmail = email.trim();
+
+        if (targetEmail.isEmpty() || !targetEmail.equalsIgnoreCase(inputEmail)) {
+            throw new IllegalArgumentException("The email address provided does not match Booking #" + bookingId + ".");
         }
 
         Map<String, Object> response = new HashMap<>();
